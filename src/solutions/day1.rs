@@ -2,78 +2,48 @@ use crate::solutions::solution;
 
 pub struct Day1Solver;
 
-fn part1(input: &str) -> String {
+fn sum_pines(input: &str, mapping: fn(u32) -> u32) -> String {
     input
         .trim()
         .split(",")
         .map(|num| num.parse::<u32>().unwrap())
-        .map(next_square_distance)
+        .map(mapping)
         .sum::<u32>()
         .to_string()
+}
+
+fn part1(input: &str) -> String {
+    sum_pines(input, next_square_distance)
 }
 
 /// Returns the distance to the next perfect square
 fn next_square_distance(num: u32) -> u32 {
-    for idx in 1.. {
-        let sq = idx * idx;
-        if sq == num {
-            return 0;
-        } else if (sq) > num {
-            return sq - num;
-        }
+    let side = num.isqrt();
+    if side * side == num {
+        0
+    } else {
+        (side + 1) * (side + 1) - num
     }
-
-    panic!("Unreachable");
 }
 
 /// Returns the distance to the next frame perimeter
 fn next_perimeter_distance(num: u32) -> u32 {
-    for idx in 3.. {
-        // Top and bottom, then on the sides it's 2 less because
-        // we don't count the edges
-        let p = (idx * 2) + ((idx - 2) * 2);
-        if p == num {
-            return 0;
-        } else if p > num {
-            return p - num;
-        }
-    }
-
-    panic!("Unreachable");
+    num.div_ceil(4).max(2) * 4 - num
 }
 
 /// Returns the distance to the next almost filled square
 fn next_almost_filled_square(num: u32) -> u32 {
-    for idx in (3..).step_by(2) {
-        let sq = (idx * idx) - 1;
-        if sq == num {
-            return 0;
-        } else if sq > num {
-            return sq - num;
-        }
-    }
-
-    panic!("Unreachable");
+    // Make sure it's always odd
+    let side = (num.isqrt() + 1) | 1;
+    side * side - num - 1
 }
 
 fn part2(input: &str) -> String {
-    input
-        .trim()
-        .split(",")
-        .map(|num| num.parse::<u32>().unwrap())
-        .map(next_perimeter_distance)
-        .sum::<u32>()
-        .to_string()
+    sum_pines(input, next_perimeter_distance)
 }
 
 fn part3(input: &str) -> String {
-    input
-        .trim()
-        .split(",")
-        .map(|num| num.parse::<u32>().unwrap())
-        .map(next_almost_filled_square)
-        .sum::<u32>()
-        .to_string()
+    sum_pines(input, next_almost_filled_square)
 }
 
 impl solution::Solver for Day1Solver {
