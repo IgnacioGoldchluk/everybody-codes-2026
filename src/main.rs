@@ -20,6 +20,7 @@ fn main() {
     let solver: Box<dyn Solver> = match args.day {
         1 => Box::new(solutions::day1::Day1Solver {}),
         2 => Box::new(solutions::day2::Day2Solver {}),
+        3 => Box::new(solutions::day3::Day3Solver {}),
         _ => todo!("Unreachable"),
     };
     let now = Instant::now();
