@@ -22,6 +22,7 @@ fn main() {
         2 => Box::new(solutions::day2::Day2Solver {}),
         3 => Box::new(solutions::day3::Day3Solver {}),
         4 => Box::new(solutions::day4::Day4Solver {}),
+        5 => Box::new(solutions::day5::Day5Solver {}),
         _ => todo!("Unreachable"),
     };
     let now = Instant::now();
