@@ -1,8 +1,10 @@
 use crate::solutions::solution;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 type Point = (i32, i32);
-type Grid = HashMap<Point, u8>;
+type Grid = HashMap<Point, i8>;
+
+const TARGET_WARRIORS: usize = 100000;
 
 pub struct Day8Solver;
 
@@ -51,8 +53,9 @@ fn points(max_row: i32, max_col: i32, direction: &Direction) -> Box<dyn Iterator
 }
 
 fn part1(input: &str) -> String {
-    let ent_grid = grid(input);
-    count_hits(&ent_grid, &Direction::RightDown).to_string()
+    list_hits(&grid(input), &Direction::RightDown)
+        .len()
+        .to_string()
 }
 
 fn part2(input: &str) -> String {
@@ -68,12 +71,65 @@ fn part2(input: &str) -> String {
 
     directions
         .iter()
-        .map(|direction| count_hits(&ent_grid, direction))
+        .map(|direction| list_hits(&ent_grid, direction).len())
         .sum::<usize>()
         .to_string()
 }
 
-fn count_hits(ent_grid: &Grid, direction: &Direction) -> usize {
+fn part3(input: &str) -> String {
+    // Generate warriors
+    let mut directions = [
+        Direction::RightDown,
+        Direction::LeftDown,
+        Direction::Left,
+        Direction::LeftUp,
+        Direction::RightUp,
+        Direction::Right,
+    ]
+    .iter()
+    .cycle();
+
+    let mut warriors = 0;
+    let mut hits = 0;
+
+    let mut ent_grid = grid(input);
+
+    while warriors < TARGET_WARRIORS {
+        let new_hits = list_hits(&ent_grid, directions.next().unwrap());
+        hits += new_hits.len();
+
+        warriors += update_grid(&mut ent_grid, &new_hits);
+    }
+
+    hits.to_string()
+}
+
+/// Updates the grid in place and returns the number of generated warriors
+fn update_grid(ent_grid: &mut Grid, hits: &HashSet<Point>) -> usize {
+    let mut new_warriors = 0;
+
+    for hit_point in hits.iter() {
+        let val = ent_grid.get_mut(hit_point).unwrap();
+
+        *val += 1;
+
+        if *val == 10 {
+            // Will be -2 this round, then -1, then 0, and then back to 1
+            *val = -3;
+            new_warriors += 1;
+        }
+    }
+
+    for value in ent_grid.values_mut() {
+        if *value < 1 {
+            *value += 1;
+        }
+    }
+
+    new_warriors
+}
+
+fn list_hits(ent_grid: &Grid, direction: &Direction) -> HashSet<Point> {
     let (max_row, max_col) = limits(ent_grid);
 
     let mut hit: HashMap<Point, bool> = HashMap::new();
@@ -81,6 +137,7 @@ fn count_hits(ent_grid: &Grid, direction: &Direction) -> usize {
     for point in points(max_row, max_col, direction) {
         if let Some(height) = ent_grid.get(&point)
             && *hit.get(&point).unwrap_or(&true)
+            && *height > 0
         {
             hit.insert(point, true);
 
@@ -105,7 +162,15 @@ fn count_hits(ent_grid: &Grid, direction: &Direction) -> usize {
         }
     }
 
-    hit.values().filter(|&touched| *touched).count()
+    hit.iter()
+        .filter_map(|(point, &touched)| {
+            if touched && ent_grid[point] > 0 {
+                Some(*point)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn grid(input: &str) -> Grid {
@@ -116,7 +181,7 @@ fn grid(input: &str) -> Grid {
             line.char_indices().filter_map(move |(col, value)| {
                 value
                     .to_digit(10)
-                    .map(|digit| ((row as i32, col as i32), digit as u8))
+                    .map(|digit| ((row as i32, col as i32), digit as i8))
             })
         })
         .collect()
@@ -139,7 +204,7 @@ impl solution::Solver for Day8Solver {
         solution::Solution {
             part1: part1(&input.part1),
             part2: part2(&input.part2),
-            part3: "".into(),
+            part3: part3(&input.part3),
         }
     }
 }
@@ -161,25 +226,15 @@ mod tests {
 ...9.3.8.3.8.4...
 ....1.6.6.2.8...."#;
 
-        let p2 = r#"....1.9.6.1.7....
-...9.2.3.3.8.1...
-..7.8.3.5.1.4.3..
-.4.6.7.4.1.1.8.9.
-4.5.3.6.5.8.9.4.9
-.9.5.1.5.6.2.8.9.
-..7.7.6.4.6.2.4..
-...9.3.8.3.8.4...
-....1.6.6.2.8...."#;
-
         let input = solution::Input {
             part1: p1.into(),
-            part2: p2.into(),
-            part3: "".into(),
+            part2: p1.into(),
+            part3: p1.into(),
         };
 
         let solution = Day8Solver.solve(input);
         assert_eq!(solution.part1, "32");
         assert_eq!(solution.part2, "187");
-        assert_eq!(solution.part3, "");
+        assert_eq!(solution.part3, "899889");
     }
 }
