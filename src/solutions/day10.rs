@@ -24,7 +24,7 @@ type Cave = HashMap<Point, CaveCell>;
 struct Ghost {
     pub position: Point,
     pub direction: GhostDirection,
-    pub collisions: usize,
+    pub collisions: u64,
 }
 
 impl Ghost {
@@ -72,6 +72,10 @@ impl Ghost {
 
         self.direction = new_direction;
     }
+
+    pub fn is_alive(&self, max_collisions: u64) -> bool {
+        self.collisions < max_collisions
+    }
 }
 
 fn build_cave_and_ghosts(input: &str) -> (Cave, Vec<Ghost>) {
@@ -111,6 +115,61 @@ fn build_cave_and_ghosts(input: &str) -> (Cave, Vec<Ghost>) {
     (cave, ghosts)
 }
 
+fn part2(input: &str) -> String {
+    max_rounds(input, max_collisions_p2())
+}
+
+fn part3(input: &str) -> String {
+    max_rounds(input, 1_000_000_000_000)
+}
+
+fn max_rounds(input: &str, max_collisions: u64) -> String {
+    let (cave, mut ghosts) = build_cave_and_ghosts(input);
+    let mut rounds: u64 = 0;
+
+    while !ghosts.is_empty() {
+        let mut position_count: HashMap<Point, u8> = HashMap::new();
+
+        for ghost in ghosts.iter_mut() {
+            match cave.get(&ghost.next_position()) {
+                Some(CaveCell::Wall) => {
+                    ghost.collisions += 1;
+                    ghost.rotate_90();
+                }
+                Some(CaveCell::Empty) => {
+                    ghost.advance();
+                }
+                None => {
+                    panic!("Unreachable");
+                }
+            }
+
+            if ghost.is_alive(max_collisions) {
+                *position_count.entry(ghost.position).or_default() += 1;
+            }
+        }
+
+        for (position, n_ghosts) in position_count {
+            if n_ghosts < 2 {
+                continue;
+            }
+
+            ghosts
+                .iter_mut()
+                .filter(|ghost| ghost.position == position)
+                .for_each(|ghost| {
+                    ghost.rotate_180();
+                    ghost.collisions += 1;
+                })
+        }
+
+        ghosts.retain(|ghost| ghost.is_alive(max_collisions));
+        rounds += 1;
+    }
+
+    rounds.to_string()
+}
+
 fn part1(input: &str) -> String {
     let (cave, mut ghosts) = build_cave_and_ghosts(input);
 
@@ -119,8 +178,7 @@ fn part1(input: &str) -> String {
     for _round in 0..10 {
         let mut position_count: HashMap<Point, u8> = HashMap::new();
         for ghost in ghosts.iter_mut() {
-            let next_position = ghost.next_position();
-            match cave.get(&next_position) {
+            match cave.get(&ghost.next_position()) {
                 Some(CaveCell::Wall) => {
                     collisions += 1;
                     ghost.rotate_90();
@@ -151,12 +209,12 @@ fn part1(input: &str) -> String {
 }
 
 #[cfg(test)]
-fn max_collisions() -> u32 {
+fn max_collisions_p2() -> u64 {
     10
 }
 
 #[cfg(not(test))]
-fn max_collisions() -> u32 {
+fn max_collisions_p2() -> u64 {
     10_000
 }
 
@@ -164,8 +222,8 @@ impl solution::Solver for Day10Solver {
     fn solve(&self, input: solution::Input) -> solution::Solution {
         solution::Solution {
             part1: part1(&input.part1),
-            part2: "".into(),
-            part3: "".into(),
+            part2: part2(&input.part2),
+            part3: part3(&input.part3),
         }
     }
 }
@@ -189,15 +247,39 @@ mod tests {
 #####.#####
 ###########"#;
 
+        let _p3 = r#"#######################
+###########.###########
+#######.^>.^.<^.#######
+#####..<.>.v^>>^^<#####
+####..v<^v.>.>v..^.####
+###.................###
+###.................###
+##.......<...<.<....>##
+##...v....>....v.v<.^##
+##........###........##
+##v......#####.......##
+#.<......#####......>.#
+##.......#####.......##
+##........###........##
+##...................##
+##...................##
+###.................###
+###.................###
+####...............####
+#####.............#####
+#######....v....#######
+###########.###########
+#######################"#;
+
         let input = solution::Input {
             part1: p1.into(),
-            part2: "".into(),
+            part2: p1.into(),
             part3: "".into(),
         };
 
         let solution = Day10Solver.solve(input);
         assert_eq!(solution.part1, "29");
-        assert_eq!(solution.part2, "");
-        assert_eq!(solution.part3, "");
+        assert_eq!(solution.part2, "53");
+        assert_eq!(solution.part3, "0");
     }
 }
