@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::solutions::solution;
 
@@ -10,7 +11,7 @@ enum CaveCell {
     Wall,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 enum GhostDirection {
     Up,
     Down,
@@ -20,6 +21,7 @@ enum GhostDirection {
 
 type Point = (usize, usize);
 type Cave = HashMap<Point, CaveCell>;
+type States = HashMap<u64, (u64, Vec<u64>)>;
 
 struct Ghost {
     pub position: Point,
@@ -52,29 +54,32 @@ impl Ghost {
     }
 
     pub fn rotate_90(&mut self) {
-        let new_direction = match self.direction {
+        self.direction = match self.direction {
             GhostDirection::Down => GhostDirection::Left,
             GhostDirection::Left => GhostDirection::Up,
             GhostDirection::Up => GhostDirection::Right,
             GhostDirection::Right => GhostDirection::Down,
         };
-
-        self.direction = new_direction;
     }
 
     pub fn rotate_180(&mut self) {
-        let new_direction = match self.direction {
+        self.direction = match self.direction {
             GhostDirection::Down => GhostDirection::Up,
             GhostDirection::Left => GhostDirection::Right,
             GhostDirection::Up => GhostDirection::Down,
             GhostDirection::Right => GhostDirection::Left,
         };
-
-        self.direction = new_direction;
     }
 
     pub fn is_alive(&self, max_collisions: u64) -> bool {
         self.collisions < max_collisions
+    }
+}
+
+impl Hash for Ghost {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.position.hash(state);
+        self.direction.hash(state);
     }
 }
 
@@ -127,7 +132,44 @@ fn max_rounds(input: &str, max_collisions: u64) -> String {
     let (cave, mut ghosts) = build_cave_and_ghosts(input);
     let mut rounds: u64 = 0;
 
+    let mut cycle_states: States = HashMap::new();
+
     while !ghosts.is_empty() {
+        let mut hasher = DefaultHasher::new();
+        ghosts.hash(&mut hasher);
+        let state_hash = hasher.finish();
+
+        let cycle_info = cycle_states.get(&state_hash).cloned();
+        if let Some((prev_round, prev_collisions)) = cycle_info {
+            let cycle_len = rounds - prev_round;
+            let deltas: Vec<u64> = ghosts
+                .iter()
+                .zip(prev_collisions.iter())
+                .map(|(g, &c)| g.collisions - c)
+                .collect();
+
+            let min_k = ghosts
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| deltas[*i] > 0)
+                .map(|(i, g)| (max_collisions - 1 - g.collisions) / deltas[i])
+                .min();
+
+            if let Some(k) = min_k
+                && k > 0
+            {
+                rounds += k * cycle_len;
+                for (i, ghost) in ghosts.iter_mut().enumerate() {
+                    ghost.collisions += k * deltas[i];
+                }
+                cycle_states.clear();
+            }
+        } else {
+            let collisions: Vec<u64> = ghosts.iter().map(|g| g.collisions).collect();
+            cycle_states.insert(state_hash, (rounds, collisions));
+        }
+
+        let prev_ghost_count = ghosts.len();
         let mut position_count: HashMap<Point, u8> = HashMap::new();
 
         for ghost in ghosts.iter_mut() {
@@ -165,6 +207,10 @@ fn max_rounds(input: &str, max_collisions: u64) -> String {
 
         ghosts.retain(|ghost| ghost.is_alive(max_collisions));
         rounds += 1;
+
+        if ghosts.len() < prev_ghost_count {
+            cycle_states.clear();
+        }
     }
 
     rounds.to_string()
@@ -247,7 +293,7 @@ mod tests {
 #####.#####
 ###########"#;
 
-        let _p3 = r#"#######################
+        let p3 = r#"#######################
 ###########.###########
 #######.^>.^.<^.#######
 #####..<.>.v^>>^^<#####
@@ -274,12 +320,12 @@ mod tests {
         let input = solution::Input {
             part1: p1.into(),
             part2: p1.into(),
-            part3: "".into(),
+            part3: p3.into(),
         };
 
         let solution = Day10Solver.solve(input);
         assert_eq!(solution.part1, "29");
         assert_eq!(solution.part2, "53");
-        assert_eq!(solution.part3, "0");
+        assert_eq!(solution.part3, "13314695352588");
     }
 }
