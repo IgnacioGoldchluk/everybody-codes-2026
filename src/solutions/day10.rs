@@ -20,7 +20,59 @@ enum GhostDirection {
 
 type Point = (usize, usize);
 type Cave = HashMap<Point, CaveCell>;
-type Ghost = (Point, GhostDirection);
+
+struct Ghost {
+    pub position: Point,
+    pub direction: GhostDirection,
+    pub collisions: usize,
+}
+
+impl Ghost {
+    pub fn new(position: Point, direction: GhostDirection) -> Self {
+        Self {
+            position,
+            direction,
+            collisions: 0,
+        }
+    }
+
+    pub fn advance(&mut self) {
+        self.position = self.next_position();
+    }
+
+    pub fn next_position(&self) -> Point {
+        let (x, y) = self.position;
+
+        match self.direction {
+            GhostDirection::Down => (x + 1, y),
+            GhostDirection::Up => (x - 1, y),
+            GhostDirection::Left => (x, y - 1),
+            GhostDirection::Right => (x, y + 1),
+        }
+    }
+
+    pub fn rotate_90(&mut self) {
+        let new_direction = match self.direction {
+            GhostDirection::Down => GhostDirection::Left,
+            GhostDirection::Left => GhostDirection::Up,
+            GhostDirection::Up => GhostDirection::Right,
+            GhostDirection::Right => GhostDirection::Down,
+        };
+
+        self.direction = new_direction;
+    }
+
+    pub fn rotate_180(&mut self) {
+        let new_direction = match self.direction {
+            GhostDirection::Down => GhostDirection::Up,
+            GhostDirection::Left => GhostDirection::Right,
+            GhostDirection::Up => GhostDirection::Down,
+            GhostDirection::Right => GhostDirection::Left,
+        };
+
+        self.direction = new_direction;
+    }
+}
 
 fn build_cave_and_ghosts(input: &str) -> (Cave, Vec<Ghost>) {
     let mut cave = HashMap::new();
@@ -36,19 +88,19 @@ fn build_cave_and_ghosts(input: &str) -> (Cave, Vec<Ghost>) {
                     cave.insert((row, col), CaveCell::Empty);
                 }
                 '>' => {
-                    ghosts.push(((row, col), GhostDirection::Right));
+                    ghosts.push(Ghost::new((row, col), GhostDirection::Right));
                     cave.insert((row, col), CaveCell::Empty);
                 }
                 '<' => {
-                    ghosts.push(((row, col), GhostDirection::Left));
+                    ghosts.push(Ghost::new((row, col), GhostDirection::Left));
                     cave.insert((row, col), CaveCell::Empty);
                 }
                 '^' => {
-                    ghosts.push(((row, col), GhostDirection::Up));
+                    ghosts.push(Ghost::new((row, col), GhostDirection::Up));
                     cave.insert((row, col), CaveCell::Empty);
                 }
                 'v' => {
-                    ghosts.push(((row, col), GhostDirection::Down));
+                    ghosts.push(Ghost::new((row, col), GhostDirection::Down));
                     cave.insert((row, col), CaveCell::Empty);
                 }
                 _ => panic!("Unreachable"),
@@ -67,18 +119,18 @@ fn part1(input: &str) -> String {
     for _round in 0..10 {
         let mut position_count: HashMap<Point, u8> = HashMap::new();
         for ghost in ghosts.iter_mut() {
-            let next_point = next_position(ghost);
-            match cave.get(&next_point) {
+            let next_position = ghost.next_position();
+            match cave.get(&next_position) {
                 Some(CaveCell::Wall) => {
                     collisions += 1;
-                    ghost.1 = rotate_90_clockwise(&ghost.1);
+                    ghost.rotate_90();
                 }
                 Some(CaveCell::Empty) => {
-                    ghost.0 = next_point;
+                    ghost.advance();
                 }
                 None => panic!("Unreachable"),
             }
-            *position_count.entry(ghost.0).or_default() += 1;
+            *position_count.entry(ghost.position).or_default() += 1;
         }
 
         for (position, n_ghosts) in position_count {
@@ -88,42 +140,24 @@ fn part1(input: &str) -> String {
 
             collisions += n_ghosts;
 
-            for ghost in ghosts.iter_mut().filter(|(p, _)| *p == position) {
-                ghost.1 = rotate_180(&ghost.1);
-            }
+            ghosts
+                .iter_mut()
+                .filter(|ghost| ghost.position == position)
+                .for_each(|ghost| ghost.rotate_180())
         }
     }
 
     collisions.to_string()
 }
 
-fn rotate_180(direction: &GhostDirection) -> GhostDirection {
-    match direction {
-        GhostDirection::Down => GhostDirection::Up,
-        GhostDirection::Left => GhostDirection::Right,
-        GhostDirection::Up => GhostDirection::Down,
-        GhostDirection::Right => GhostDirection::Left,
-    }
+#[cfg(test)]
+fn max_collisions() -> u32 {
+    10
 }
 
-fn rotate_90_clockwise(direction: &GhostDirection) -> GhostDirection {
-    match direction {
-        GhostDirection::Down => GhostDirection::Left,
-        GhostDirection::Left => GhostDirection::Up,
-        GhostDirection::Up => GhostDirection::Right,
-        GhostDirection::Right => GhostDirection::Down,
-    }
-}
-
-fn next_position(ghost: &Ghost) -> Point {
-    let ((x, y), direction) = *ghost;
-
-    match direction {
-        GhostDirection::Down => (x + 1, y),
-        GhostDirection::Up => (x - 1, y),
-        GhostDirection::Left => (x, y - 1),
-        GhostDirection::Right => (x, y + 1),
-    }
+#[cfg(not(test))]
+fn max_collisions() -> u32 {
+    10_000
 }
 
 impl solution::Solver for Day10Solver {
