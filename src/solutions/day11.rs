@@ -3,10 +3,35 @@ use regex::Regex;
 
 pub struct Day11Solver;
 
+fn part2(input: &str) -> String {
+    let (portals, connections) = portals_connections(input);
+
+    let initial_strain = portal_distances(portals, 3, &[]);
+    let base_dist = distance_matrix(portals, 3, &connections);
+
+    let mut min_teleportations = usize::MAX;
+    for u in 0..portals {
+        for v in (u + 1)..portals {
+            let mut total = 0;
+            for i in 0..portals {
+                for j in 0..portals {
+                    let d = base_dist[i][j]
+                        .min(base_dist[i][u] + 1 + base_dist[v][j])
+                        .min(base_dist[i][v] + 1 + base_dist[u][j]);
+                    total += d;
+                }
+            }
+            min_teleportations = min_teleportations.min(total);
+        }
+    }
+
+    (initial_strain - min_teleportations).to_string()
+}
+
 fn part1(input: &str) -> String {
     let (portals, connections) = portals_connections(input);
 
-    (base_distance(portals) - portal_distances(portals, &connections)).to_string()
+    (base_distance(portals) - portal_distances(portals, 1, &connections)).to_string()
 }
 
 fn portals_connections(input: &str) -> (usize, Vec<(usize, usize)>) {
@@ -17,13 +42,20 @@ fn portals_connections(input: &str) -> (usize, Vec<(usize, usize)>) {
     (num_portals, parse_connections(connections))
 }
 
-fn portal_distances(num_portals: usize, connections: &[(usize, usize)]) -> usize {
+fn distance_matrix(
+    num_portals: usize,
+    connected_neighbors: usize,
+    connections: &[(usize, usize)],
+) -> Vec<Vec<usize>> {
     // Use usize::MAX / 2 to avoid overflow
     let mut distances = vec![vec![usize::MAX / 2; num_portals]; num_portals];
     for i in 0..num_portals {
         distances[i][i] = 0;
-        distances[i][(i + 1) % num_portals] = 1;
-        distances[i][(i + num_portals - 1) % num_portals] = 1;
+
+        for neighbor in 1..=connected_neighbors {
+            distances[i][(i + neighbor) % num_portals] = 1;
+            distances[i][(i + num_portals - neighbor) % num_portals] = 1;
+        }
     }
 
     for &(from, to) in connections {
@@ -40,7 +72,18 @@ fn portal_distances(num_portals: usize, connections: &[(usize, usize)]) -> usize
         }
     }
 
-    distances.iter().flatten().sum()
+    distances
+}
+
+fn portal_distances(
+    num_portals: usize,
+    connected_neighbors: usize,
+    connections: &[(usize, usize)],
+) -> usize {
+    distance_matrix(num_portals, connected_neighbors, connections)
+        .iter()
+        .flatten()
+        .sum()
 }
 
 fn parse_connections(connections: &str) -> Vec<(usize, usize)> {
@@ -69,7 +112,7 @@ impl solution::Solver for Day11Solver {
     fn solve(&self, input: solution::Input) -> solution::Solution {
         solution::Solution {
             part1: part1(&input.part1),
-            part2: "".into(),
+            part2: part2(&input.part2),
             part3: "".into(),
         }
     }
@@ -89,13 +132,13 @@ mod tests {
 
         let input = solution::Input {
             part1: p1.into(),
-            part2: "".into(),
+            part2: p1.into(),
             part3: "".into(),
         };
 
         let solution = Day11Solver.solve(input);
         assert_eq!(solution.part1, "60");
-        assert_eq!(solution.part2, "");
+        assert_eq!(solution.part2, "6");
         assert_eq!(solution.part3, "");
     }
 }
